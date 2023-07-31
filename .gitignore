@@ -1,0 +1,4 @@
+*.loq
+*.fdb_latexmk
+nul
+/.quarto/

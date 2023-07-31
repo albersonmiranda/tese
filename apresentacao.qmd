@@ -1,0 +1,391 @@
+---
+title: MÉTODOS DE MACHINE LEARNING PARA RECONCILIAÇÃO ÓTIMA 
+subtitle: SÉRIES TEMPORAIS HIERÁRQUICAS E AGRUPADAS
+author: Alberson Miranda, PPGEco/UFES
+date: '`r format(Sys.Date(), "%B de %Y")`'
+format:
+    beamer:
+        include-in-header: config/beamer/preamble.tex
+        include-after-body: config/beamer/backmatter.tex
+        output-file: render/apresentacao.pdf
+        keep-tex: false
+bibliography: config/elementos/dissertacao.bib
+cite-method: biblatex
+link-citations: true
+link-bibliography: true
+---
+
+```{r config}
+#| include = FALSE
+
+# opções
+knitr::opts_chunk$set(
+    out.width = "90%"
+)
+
+# reprodutibilidade
+set.seed(1)
+
+# pacotes
+pacman::p_load(
+    kableExtra,
+    ggplot2,
+    tsibble,
+    fable,
+    fabletools
+)
+
+# tema ggplot
+tema = theme_classic() +
+    theme(
+        text = element_text(family = "serif")
+    )
+
+# gerar bibliografia de pacotes
+knitr::write_bib(
+    c(.packages(), "basedosdados")
+    , file = "config/elementos/packages.bib"
+)
+
+# scripts
+source("scripts/hierarq.R")
+```
+
+# CONTEXTUALIZAÇÃO DA PESQUISA
+
+## ANÁLISE DE SÉRIES TEMPORAIS EM ECONOMIA BANCÁRIA
+
+- Problemas populares na literatura: risco de crédito, detecção de anomalias (fraude), preços de ativos, alocação ótima de numerários [@sezer_financial_2019]
+- Pouco sobre projeção de saldos e rendas (*guidance*, *budgeting*)
+- Previsões equivocadas = percepção de incompetência, redução de reputação e receitas [@beccalli_earnings_2015]
+- *Budgeting* em empresas de muitas filiais: alta dimensionalidade e dúvidas
+
+## ANÁLISE DE SÉRIES TEMPORAIS EM ECONOMIA BANCÁRIA
+
+- Banestes: 96 agências, 70 municípios do ES^[Postos de atendimento não contam como agência.], 13 microrregiões, 4 mesorregiões
+- Qual a melhor forma de realizar projeções?
+    - Individualmente por agência?
+    - Apenas o total e distribuir proporcionalmente?
+    - As informações por mesorregião ou microrregião são importantes?
+    - Como usar toda a informação?
+
+## SÉRIES TEMPORAIS HIERÁRQUICAS E AGRUPADAS
+
+Séries temporais hierárquicas são aquelas que podem ser agregadas ou desagregadas naturalmente em uma estrutura aninhada [@hyndman_forecasting_2021]
+
+## SÉRIES TEMPORAIS HIERÁRQUICAS E AGRUPADAS
+
+![](img/hierarq.png)
+
+## SÉRIES TEMPORAIS HIERÁRQUICAS E AGRUPADAS
+
+- Cada nível traz informação diferente
+- É razoável supor que exista covariância entre as previsões dos diferentes níveis
+- Toda informação da estrutura pode ser útil
+
+## SÉRIES TEMPORAIS HIERÁRQUICAS E AGRUPADAS
+
+Séries temporais agrupadas são aquelas que não impõem uma única estrutura hierárquica
+
+## SÉRIES TEMPORAIS HIERÁRQUICAS E AGRUPADAS
+
+![](img/agrupadas.png)
+
+## SÉRIES TEMPORAIS HIERÁRQUICAS E AGRUPADAS
+
+![](img/hier_agrup.png)
+
+## SÉRIES TEMPORAIS HIERÁRQUICAS E AGRUPADAS
+
+![](img/hier_agrup_2.png)
+
+## COERÊNCIA E RECONCILIAÇÃO
+
+- Coerência: cada nó da hierarquia deve totalizar os nós filhos
+- Não há razão para que as previsões individuais (e.g., Arima, ETS) sejam coerentes
+
+### RECONCILIAÇÃO ÓTIMA
+
+Reescrever as previsões de forma que elas sejam coerentes, utilizando toda a informação disponível na estrutura hierárquica, ao mesmo tempo em que minimiza a variância do erro de previsão
+
+# OBJETIVOS
+
+## OBJETIVO GERAL
+
+Estudar o problema da reconciliação ótima de previsões pontuais a partir de métodos de *machine learning*
+
+## OBJETIVOS ESPECÍFICOS
+
+1. Aplicar o método *elastic net* [@zou_regularization_2005] para reconciliação ótima de previsões pontuais de séries temporais hierárquicas e agrupadas e atestar sua validade em dados de alta dimensionalidade;
+1. Comparar a performance, em termos de funções de custo e tempo de processamento, do mpetodo *elastic net* nas configurações $\alpha=0$ (*lasso*), $\alpha=1$ (*ridge*) e uma combinação de ambos obtida via reamostragem;
+1. Comparar a performance, em termos de funções de custo e tempo de processamento, do método *elastic net* com os métodos analíticos *bottom-up*, *top-down* e *MinT Shrink*;
+
+## OBJETIVOS ESPECÍFICOS
+
+4. Comparar a performance, em termos de funções de custo e tempo de processamento, das estratégias de reamostragem validação cruzada $k$*-fold* e *holdout* para o método *elastic net*;
+5. Verificar se a aplicação de regressão regularizada resulta em algum padrão reconhecível na estrutura (e.g., se a regularização tende a favorecer os coeficientes de séries temporais que compartilham o mesmo nó pai ou, em outras palavras, se tende a zerar os coeficientes de séries temporais que não compartilham o mesmo nó pai na hierarquia);
+
+# ABORDAGENS DE NÍVEL ÚNICO
+
+## BOTTOM-UP
+
+- informações apenas dos níveis mais desagregados
+- soma-se para obter os níveis agregados
+
+## TOP-DOWN
+
+::: {.incremental}
+- apenas informações do nível mais agregado
+- há dezenas de métodos para distribuir proporcionalmente as previsões agregadas [@gross_disaggregation_1990]
+    - proporções históricas $$p_j = \frac{1}{T} \sum^{T}_{t=1} \frac{y_{j,t}}{y_t}$$ {#eq-top_down1}
+    - médias históricas $$p_j = \frac{\sum^{T}_{t=1} \frac{y_{j,t}}{T}}{\sum^{T}_{t=1} \frac{y_{t}}{T}}$$ {#eq-top_down2}
+    - proporções das previsões [@athanasopoulos_hierarchical_2009] $$p_j=\prod^{K-1}_{\ell=0}\frac{\hat{y}_{j,h}^{(\ell)}}{\hat{S}_{j,h}^{(\ell+1)}}$$ {#eq-top_down3}
+:::
+
+## MIDDLE-OUT
+
+- informações apenas de um nível intermediário
+- soma-se para obter os níveis agregados e distribui-se proporcionalmente para os níveis mais desagregados
+
+# MÉTODOS ANALÍTICOS PARA RECONCILIAÇÃO ÓTIMA
+
+## NOTAÇÃO MATRICIAL
+
+$$
+\mathbfit{\tilde{y}_t} = \mathbfit{SG\hat{y}_t}
+$$ {#eq-reconciliacao1}
+
+Em que
+
+- $\mathbfit{\tilde{y}_t}$ é o vetor de previsões reconciliadas
+- $\mathbfit{S}$ é a matriz de soma
+- $\mathbfit{G}$ é a matriz de reconciliação
+- $\mathbfit{\hat{y}_t}$ é o vetor de previsões base
+
+## MATRIZ DE SOMA
+
+$\mathbfit{S}$ mapeia a estrutura hierárquica a partir da soma dos elementos mais desagregados
+
+$$
+\begin{bmatrix}
+    \tilde{y}_{t} \\
+    \tilde{y}_{A,t} \\
+    \tilde{y}_{B,t} \\
+    \tilde{y}_{AA,t} \\
+    \tilde{y}_{AB,t} \\
+    \tilde{y}_{AC,t} \\
+    \tilde{y}_{BA,t} \\
+    \tilde{y}_{BB,t}
+  \end{bmatrix}_{n \times 1}
+  =
+  \begin{bmatrix}
+    1 & 1 & 1 & 1 & 1 \\
+    1 & 1 & 1 & 0 & 0 \\
+    0 & 0 & 0 & 1 & 1 \\
+    1  & 0  & 0  & 0  & 0  \\
+    0  & 1  & 0  & 0  & 0  \\
+    0  & 0  & 1  & 0  & 0  \\
+    0  & 0  & 0  & 1  & 0  \\
+    0  & 0  & 0  & 0  & 1
+  \end{bmatrix}_{n \times m}
+  \begin{bmatrix}
+    \hat{y}_{AA,t} \\
+    \hat{y}_{AB,t} \\
+    \hat{y}_{AC,t} \\
+    \hat{y}_{BA,t} \\
+    \hat{y}_{BB,t}
+  \end{bmatrix}_{m \times 1}
+$$ {#eq-reconciliacao2}
+
+\begin{center}
+\scriptsize
+\bf{\it{exemplo 1: matriz de soma}}
+\end{center}
+
+## MATRIZ DE RECONCILIAÇÃO
+
+$\mathbfit{G}$ mapeia o nível mais desagregado a partir das previsões de todos os níveis da hierarquia, garantindo a coerência
+
+$$
+\begin{bmatrix}
+    \tilde{y}_{t} \\
+    \tilde{y}_{A, t} \\
+    \tilde{y}_{B, t} \\
+    \tilde{y}_{AA, t} \\
+    \tilde{y}_{AB, t} \\
+    \tilde{y}_{AC, t} \\
+    \tilde{y}_{BA, t} \\
+    \tilde{y}_{BB, t}
+\end{bmatrix}_{n \times 1}
+=
+\mathbfit{S}_{n \times m}
+\begin{bmatrix}
+    p_1 & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\
+    p_2 & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\
+    p_3 & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\
+    p_4 & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\
+    p_5 & 0 & 0 & 0 & 0 & 0 & 0 & 0
+\end{bmatrix}_{m \times n}
+\begin{bmatrix}
+    \hat{y}_{T+h|T} \\
+    \hat{y}_{A, T+h|T} \\
+    \hat{y}_{B, T+h|T} \\
+    \hat{y}_{AA, T+h|T} \\
+    \hat{y}_{AB, T+h|T} \\
+    \hat{y}_{AC, T+h|T} \\
+    \hat{y}_{BA, T+h|T} \\
+    \hat{y}_{BB, T+h|T}
+\end{bmatrix}_{n \times 1}
+$$ {#eq-reconciliacao3}
+
+\begin{center}
+\scriptsize
+\bf{\it{exemplo 2: matriz de reconciliação} top-down}
+\end{center}
+
+## MATRIZ DE RECONCILIAÇÃO
+
+$$
+\begin{bmatrix}
+    \tilde{y}_{t} \\
+    \tilde{y}_{A, t} \\
+    \tilde{y}_{B, t} \\
+    \tilde{y}_{AA, t} \\
+    \tilde{y}_{AB, t} \\
+    \tilde{y}_{AC, t} \\
+    \tilde{y}_{BA, t} \\
+    \tilde{y}_{BB, t}
+\end{bmatrix}_{n \times 1}
+=
+\mathbfit{S}_{n \times m}
+\begin{bmatrix}
+    0 & 0 & 0 & 1 & 0 & 0 & 0 & 0 \\
+    0 & 0 & 0 & 0 & 1 & 0 & 0 & 0 \\
+    0 & 0 & 0 & 0 & 0 & 1 & 0 & 0 \\
+    0 & 0 & 0 & 0 & 0 & 0 & 1 & 0 \\
+    0 & 0 & 0 & 0 & 0 & 0 & 0 & 1
+\end{bmatrix}_{m \times n}
+\begin{bmatrix}
+    \hat{y}_{T+h|T} \\
+    \hat{y}_{A, T+h|T} \\
+    \hat{y}_{B, T+h|T} \\
+    \hat{y}_{AA, T+h|T} \\
+    \hat{y}_{AB, T+h|T} \\
+    \hat{y}_{AC, T+h|T} \\
+    \hat{y}_{BA, T+h|T} \\
+    \hat{y}_{BB, T+h|T}
+\end{bmatrix}_{n \times 1}
+$$ {#eq-reconciliacao4}
+
+\begin{center}
+\scriptsize
+\bf{\it{exemplo 3: matriz de reconciliação} bottom-up}
+\end{center}
+
+## MATRIZ DE RECONCILIAÇÃO
+
+E se quisermos utilizar toda a informação e não apenas parte do espaço das previsões base?
+
+### O PROBLEMA DE PESQUISA DA RECONCILIAÇÃO ÓTIMA
+
+Estimar uma matriz de reconciliação $\mathbfit{G}$ que utilize toda a informação disponível e com o menor erro de previsão
+
+## RECONCILIAÇÃO ÓTIMA
+
+### PROBLEMA DE REGRESSÃO
+
+- Minimização do traço da matriz de covariância dos erros das previsões reconciliadas (MinT^[[@wickramasuriya_optimal_2019].])
+$$\min_{\tilde{e}} y_{T+h} - \tilde{y}_{T+h}$$ {#eq-mint1}
+
+- Mínimos Quadrados Generalizados (MQG)
+$$\mathbfit{G}=(\mathbfit{S}'\mathbfit{W}_h^{\dagger}\mathbfit{S})^{-1}\mathbfit{S}'\mathbfit{W}_h^{\dagger}$$ {#eq-mint2}
+
+## RECONCILIAÇÃO ÓTIMA
+
+- 1ª abordagem: $\mathbfit{W}_h = k_hI$
+    - Mínimos Quadrados Ordinários (MQO)
+    - Não há qualquer razão ou justificativa para supor homoscedasticidade
+    - Erros descorrelacionados e equivariantes não fazem sentido em séries hierárquicas
+
+## RECONCILIAÇÃO ÓTIMA
+
+- 2ª abordagem: $\mathbfit{W}_h = k_h\text{diag}(\mathbfit{\hat{W_1}}) \mid \mathbfit{\hat{W_1}} = \frac{1}{T}\sum^{T}_{t=1}\mathbfit{\hat{e}}_{T+1}\mathbfit{\hat{e}'}_{T+1}$
+    - Mínimos Quadrados Ponderados (MQP)
+    - $\mathbfit{\hat{e}}_{T+1} = \mathbfit{y_{T+1}} - \mathbfit{\hat{y}}_{T+1}$
+    - Erros descorrelacionados e ponderados pela variância do erro das previsões base
+
+## RECONCILIAÇÃO ÓTIMA
+
+- 3ª abordagem: $\mathbfit{W}_h = k_h\mathbfit{\hat{W}}_1$
+    - MQG irrestrito
+    - Quando $m \geq T$, pode-se usar estimador de encolhimento
+    - Leva em consideração correlação e variância ao longo de toda estrutura
+
+# MÉTODOS DE MACHINE LEARNING PARA RECONCILIAÇÃO ÓTIMA
+
+## ELASTIC NET
+
+- O *elastic net* [@zou_regularization_2005] é um método de regressão regularizada que combina as penalidades *lasso* e do *ridge*
+- A função objetivo a ser minimizada é dada por
+
+$$
+L(\lambda_1, \lambda_2, \mathbfit{\beta}) = |\mathbf{y} - \mathbf{X}\mathbfit{\beta}|^2 + \lambda_2|\mathbfit{\beta}|^2 + \lambda_1|\mathbfit{\beta}|_1
+$$ {#eq-elastic_net1}
+
+## ELASTIC NET
+
+- Solução dada por
+$$
+\mathbfit{\hat{\beta}} = \arg \min_{\mathbfit{\beta}} |\mathbf{y}-\mathbf{X}\mathbfit{\beta}|^2 \text{, sujeito a } (1-\alpha)|\mathbfit{\beta}|_1 + \alpha|\mathbfit{\beta}|^2 \leq t
+$$ {#eq-elastic_net2}
+
+- $\alpha = \frac{\lambda_2}{\lambda_1 + \lambda_2}$ e $t \in \mathbb{R}^+$ ($t = L_1$)
+- $\alpha = 0 \implies \lambda_2 = 0$, *lasso*
+- $\alpha = 1 \implies \lambda_1 = 0$, *ridge*
+
+# METODOLOGIA
+
+## DADOS E VARIÁVEIS
+
+- Estatística Bancária Mensal e por Município (Bacen)
+- Municípios (IBGE)
+- Saldos de crédito
+- CNPJ Banestes (expansível para todo SFN)
+- 01/2010 - 02/2023
+- 43.923 observações
+
+## DADOS E VARIÁVEIS
+
+- Estrutura hierárquica
+    - total
+    - 4 mesorregiões
+    - 13 microrregiões
+    - 96 agências
+- Estrutura agrupada
+    - 3 modalidades de crédito
+
+## DESIGN DO EXPERIMENTO
+
+- $\mathbfit{\hat{y}}$ via Arima ou ETS
+- *benchmark* (RMSE, tempo de processamento):
+    - *Top-down*
+    - *bottom-up*
+    - MinT OLS
+    - MinT WLS
+    - MinT *Shrink* ($t = 156, m = 96 \times 3$)
+    - *Elastic Net* Lasso
+    - *Elastic Net* Ridge
+    - *Elastic Net* CV-5
+
+## DESIGN DO EXPERIMENTO
+
+- Procedimentos para o método *elastic net* [@spiliotis_hierarchical_2021]
+    1. Obter $\mathbfit{\hat{y}}_{t+1}$
+    2. Treinar modelo *elastic net* usando (1) como preditores e    $\mathbfit{y}_{t+1}$ como alvo
+    3. Obter $\mathbfit{\hat{y}}_{T+h}$
+    4. Obter $\mathbfit{\tilde{y}}_{T+h}$ passando os preditores (3)    ao modelo treinado em (2)
+    5. Agregar as previsões reconciliadas para obter as previsões nos demais níveis hierárquicos
+
+# REFERÊNCIAS
+
+## BIBLIOGRAFIA
