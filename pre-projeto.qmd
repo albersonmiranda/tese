@@ -19,17 +19,7 @@ Séries temporais hierárquicas são aquelas que podem ser agregadas ou desagreg
 
 ![Séries Hierárquicas](img/hierarq.png){#fig-h}
 
-Essa estrutura pode ser representada através de equações para qualquer nível de agregação.
-
-Essa estrutura pode ser representada através de equações para qualquer nível de agregação. Dessa forma, o agregado nacional pode ser descrito pelos agregados dos estados, Equação \eqref{eq:ha}, ou como o agregado dos municípios, Equação \eqref{eq:ha_mun}. Já o agregado para o estado A é representado pela Equação \eqref{eq:haES}.
-
-\begin{align}
-y_t &= y_{A,t} + y_{B,t} + y_{C,t} \label{eq:ha} \\
-y_t &= y_{AA,t} + y_{AB,t} + y_{BA,t} + y_{BB,t} + y_{CA,t} + y_{CB,t}\label{eq:ha_mun} \\
-y_{A,t} &= y_{AA,t} + y_{AB,t}\label{eq:haES}
-\end{align}
-
-Na notação matricial, essas estruturas são representadas pelo vetor $\mathbfit{y}_t$ $n$-dimensional com todas as observações no tempo $t$ para todos os níveis da hierarquia, pela matriz de soma $\mathbfit{S}$ de dimensão $n \times m$ que define as equações para todo nível de agregação, e pelo vetor $\mathbfit{b}_t$ composto pelas séries no nível mais desagregado.
+Na notação matricial, essas estruturas são representadas pelo vetor $\mathbfit{y}_t$ $n$-dimensional com todas as observações no tempo $t$, pela matriz de soma $\mathbfit{S}$ de dimensão $n \times m$ que define as equações para todos os elementos da hierarquia, e pelo vetor $\mathbfit{b}_t$ composto pelas séries no nível mais desagregado.
 
 $$
 \mathbfit{y}_t=\mathbfit{Sb}_t
